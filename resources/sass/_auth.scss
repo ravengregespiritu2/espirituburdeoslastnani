@@ -13,8 +13,10 @@
   position: fixed;
   top: 14px;
   left: 18px;
-  z-index: 1000;
+  z-index: 1; // Put it behind the content but above background
   pointer-events: none; // Prevent interference with content
+  transform: translateZ(0); // Force hardware acceleration for better performance
+  will-change: transform; // Optimize for animations/scrolling
 
   .brand-gradient {
     font-size: 28px;
@@ -25,6 +27,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    display: block; // Ensure proper display
   }
 
   @media (max-width: 768px) {

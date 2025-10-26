@@ -11981,13 +11981,16 @@ textarea.form-control-lg {
 }
 .admin-shell {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding-top: 60px;
+  max-width: none;
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 10;
 }
 @media (max-width: 768px) {
   .admin-shell {
-    padding-top: 20px;
+    padding: 10px;
   }
 }
 
@@ -12086,6 +12089,7 @@ textarea.form-control-lg {
   border-radius: 20px;
   background: #fff;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
 }
 
 .side-heading {

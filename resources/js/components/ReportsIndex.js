@@ -12,6 +12,8 @@ const ReportsIndex = () => {
     });
     const [summary, setSummary] = useState({});
     const [loading, setLoading] = useState(false);
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [selectAll, setSelectAll] = useState(false);
 
     useEffect(() => {
         fetchDepartments();
@@ -73,29 +75,99 @@ const ReportsIndex = () => {
         }));
     };
 
-    const handleGenerateDocument = (e) => {
+    const handleGenerateDocument = async (e) => {
         e.preventDefault();
-        generateReport();
+        
+        if (selectedItems.length === 0) {
+            alert('Please select at least one item to generate a report.');
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            const params = new URLSearchParams({
+                ...filters,
+                selected_items: selectedItems.join(','),
+                format: 'pdf'
+            });
+            
+            const response = await fetch(`/api/admin/reports/generate?${params}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/pdf',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filters.type}_report_${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                alert('Error generating PDF report. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Error generating PDF report. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
+    const handleSelectItem = (itemId) => {
+        setSelectedItems(prev => {
+            if (prev.includes(itemId)) {
+                return prev.filter(id => id !== itemId);
+            } else {
+                return [...prev, itemId];
+            }
+        });
+    };
+    
+    const handleSelectAll = () => {
+        if (selectAll) {
+            setSelectedItems([]);
+        } else {
+            setSelectedItems(results.map(item => item.id));
+        }
+        setSelectAll(!selectAll);
+    };
+    
     const getTableHeaders = () => {
         switch (filters.type) {
             case 'students':
-                return ['Name', 'Email', 'Department', 'Course', 'Academic Year', 'Status'];
+                return ['Select', 'Name', 'Email', 'Department', 'Course', 'Academic Year', 'Status'];
             case 'faculties':
-                return ['Name', 'Email', 'Department', 'Position', 'Status'];
+                return ['Select', 'Name', 'Email', 'Department', 'Position', 'Status'];
             case 'courses':
-                return ['Code', 'Title', 'Department', 'Status'];
+                return ['Select', 'Code', 'Title', 'Department', 'Enrolled Students', 'Status'];
             default:
-                return ['Code', 'Name', 'Location', 'Status'];
+                return ['Select', 'Code', 'Name', 'Courses', 'Faculty Members', 'Status'];
         }
     };
 
     const renderTableRow = (row) => {
+        const isSelected = selectedItems.includes(row.id);
+        
         switch (filters.type) {
             case 'students':
                 return (
                     <>
+                        <td>
+                            <input 
+                                type="checkbox" 
+                                className="form-check-input"
+                                checked={isSelected}
+                                onChange={() => handleSelectItem(row.id)}
+                            />
+                        </td>
                         <td className="student-name">
                             {row.full_name}
                             {row.suffix && <span className="text-muted"> {row.suffix}</span>}
@@ -110,6 +182,14 @@ const ReportsIndex = () => {
             case 'faculties':
                 return (
                     <>
+                        <td>
+                            <input 
+                                type="checkbox" 
+                                className="form-check-input"
+                                checked={isSelected}
+                                onChange={() => handleSelectItem(row.id)}
+                            />
+                        </td>
                         <td className="faculty-name">
                             {row.full_name}
                             {row.suffix && <span className="text-muted"> {row.suffix}</span>}
@@ -123,18 +203,48 @@ const ReportsIndex = () => {
             case 'courses':
                 return (
                     <>
+                        <td>
+                            <input 
+                                type="checkbox" 
+                                className="form-check-input"
+                                checked={isSelected}
+                                onChange={() => handleSelectItem(row.id)}
+                            />
+                        </td>
                         <td>{row.code}</td>
                         <td>{row.title}</td>
                         <td>{row.department?.name || '—'}</td>
+                        <td>
+                            <span className="badge bg-info">
+                                {row.students_count || 0} students
+                            </span>
+                        </td>
                         <td><span className={`status-text status-${row.status?.toLowerCase()}`}>{row.status}</span></td>
                     </>
                 );
             default:
                 return (
                     <>
+                        <td>
+                            <input 
+                                type="checkbox" 
+                                className="form-check-input"
+                                checked={isSelected}
+                                onChange={() => handleSelectItem(row.id)}
+                            />
+                        </td>
                         <td>{row.code}</td>
                         <td>{row.name}</td>
-                        <td>{row.location}</td>
+                        <td>
+                            <span className="badge bg-primary me-1">
+                                {row.courses_count || 0} courses
+                            </span>
+                        </td>
+                        <td>
+                            <span className="badge bg-success">
+                                {row.faculty_count || 0} faculty
+                            </span>
+                        </td>
                         <td><span className={`status-text status-${row.status?.toLowerCase()}`}>{row.status}</span></td>
                     </>
                 );
@@ -187,9 +297,18 @@ const ReportsIndex = () => {
                                     ))}
                                 </select>
                             </div>
-                            <div className="col-12 d-flex justify-content-end">
-                                <button type="submit" className="report-generate">
-                                    Generate Document
+                            <div className="col-12 d-flex justify-content-between align-items-center">
+                                <div className="text-muted">
+                                    {selectedItems.length > 0 && (
+                                        <span>{selectedItems.length} item(s) selected</span>
+                                    )}
+                                </div>
+                                <button 
+                                    type="submit" 
+                                    className="report-generate"
+                                    disabled={loading || selectedItems.length === 0}
+                                >
+                                    {loading ? 'Generating PDF...' : 'Generate PDF Document'}
                                 </button>
                             </div>
                         </form>
@@ -213,8 +332,17 @@ const ReportsIndex = () => {
                             <table className="table align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        {getTableHeaders().map(header => (
-                                            <th key={header}>{header}</th>
+                                        {getTableHeaders().map((header, index) => (
+                                            <th key={header}>
+                                                {header === 'Select' ? (
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="form-check-input"
+                                                        checked={selectAll}
+                                                        onChange={handleSelectAll}
+                                                    />
+                                                ) : header}
+                                            </th>
                                         ))}
                                     </tr>
                                 </thead>

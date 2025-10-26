@@ -17,6 +17,7 @@ const StudentForm = ({ student = null, isEdit = false }) => {
     });
     const [departments, setDepartments] = useState([]);
     const [courses, setCourses] = useState([]);
+    const [filteredCourses, setFilteredCourses] = useState([]);
     const [academicYears, setAcademicYears] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
@@ -41,6 +42,16 @@ const StudentForm = ({ student = null, isEdit = false }) => {
             });
         }
     }, [student]);
+
+    // Filter courses when courses are loaded and student has a department
+    useEffect(() => {
+        if (student && student.department_id && courses.length > 0) {
+            const departmentCourses = courses.filter(course => 
+                course.department_id === parseInt(student.department_id)
+            );
+            setFilteredCourses(departmentCourses);
+        }
+    }, [courses, student]);
 
     const fetchDepartments = async () => {
         try {
@@ -100,6 +111,21 @@ const StudentForm = ({ student = null, isEdit = false }) => {
             ...prev,
             [name]: value
         }));
+        
+        // If department changes, filter courses and clear course selection
+        if (name === 'department_id') {
+            const departmentCourses = courses.filter(course => 
+                course.department_id === parseInt(value)
+            );
+            setFilteredCourses(departmentCourses);
+            
+            // Clear course selection when department changes
+            setFormData(prev => ({
+                ...prev,
+                course_id: ''
+            }));
+        }
+        
         // Clear error when user starts typing
         if (errors[name]) {
             setErrors(prev => ({
@@ -279,8 +305,11 @@ const StudentForm = ({ student = null, isEdit = false }) => {
                                     required
                                 >
                                     <option value="">— Select Course —</option>
-                                    {courses.map(course => (
-                                        <option key={course.id} value={course.id}>{course.title}</option>
+                                    {!formData.department_id && (
+                                        <option value="" disabled>Please select a department first</option>
+                                    )}
+                                    {filteredCourses.map(course => (
+                                        <option key={course.id} value={course.id}>{course.code} - {course.title}</option>
                                     ))}
                                 </select>
                                 {errors.course_id && <div className="invalid-feedback">{errors.course_id[0]}</div>}

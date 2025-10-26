@@ -222,17 +222,11 @@ class CourseController extends Controller
                 $query->orWhere('title', 'like', "%$q%");
             })
             ->orderBy('code')
-            ->paginate(10)
-            ->withQueryString();
+            ->get();
 
         return response()->json([
-            'courses' => $courses->items(),
-            'pagination' => [
-                'current_page' => $courses->currentPage(),
-                'last_page' => $courses->lastPage(),
-                'per_page' => $courses->perPage(),
-                'total' => $courses->total()
-            ]
+            'courses' => $courses,
+            'total' => $courses->count()
         ]);
     }
 

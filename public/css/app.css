@@ -12067,8 +12067,10 @@ label.form-label {
   position: fixed;
   top: 14px;
   left: 18px;
-  z-index: 1000;
+  z-index: 1;
   pointer-events: none;
+  transform: translateZ(0);
+  will-change: transform;
 }
 .brand-banner .brand-gradient {
   font-size: 28px;
@@ -12079,6 +12081,7 @@ label.form-label {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  display: block;
 }
 @media (max-width: 768px) {
   .brand-banner {

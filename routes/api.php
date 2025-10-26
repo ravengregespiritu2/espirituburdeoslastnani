@@ -46,6 +46,8 @@ Route::prefix('admin')->name('api.admin.')->group(function () {
     Route::put('/departments/{department}', [DepartmentController::class, 'apiUpdate'])->name('departments.update');
     Route::patch('/departments/{department}/archive', [DepartmentController::class, 'archive'])->name('departments.archive');
     Route::get('/reports', [ReportController::class, 'apiIndex'])->name('reports.api');
+    Route::get('/reports/generate', [ReportController::class, 'generatePdf'])->name('reports.generate');
+    Route::get('/reports/{type}/{id}/details', [ReportController::class, 'getItemDetails'])->name('reports.details');
     // Settings/profile and archive/restore endpoints (moved from web.php)
     Route::post('/settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
     Route::put('/profile', [\App\Http\Controllers\Admin\ProfileController::class, 'update'])->name('profile.update');

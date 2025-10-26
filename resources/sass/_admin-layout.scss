@@ -1,12 +1,15 @@
 // Admin Layout Styles
 .admin-shell {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding-top: 60px; // Add top padding to prevent brand banner overlap
+  max-width: none; // Remove max-width for full screen
+  margin: 0;
+  padding: 20px; // Add padding around the entire shell
+  min-height: 100vh; // Full viewport height
+  position: relative; // Establish stacking context
+  z-index: 10; // Ensure admin content is above brand banner
   
   @media (max-width: 768px) {
-    padding-top: 20px; // Less padding on mobile since banner is hidden
+    padding: 10px;
   }
 }
 
@@ -121,6 +124,7 @@
   border-radius: 20px;
   background: #fff;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.10);
+  margin-top: 60px; // Add top margin to make space for brand banner
 }
 
 .side-heading {

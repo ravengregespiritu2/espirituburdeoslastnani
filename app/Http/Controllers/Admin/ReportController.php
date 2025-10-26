@@ -9,6 +9,8 @@ use App\Models\Course;
 use App\Models\Department;
 use App\Models\AcademicYear;
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -83,33 +85,169 @@ class ReportController extends Controller
             $query = Student::with(['department','course','academicYear']);
             if ($departmentId) $query->where('department_id', $departmentId);
             if ($courseId) $query->where('course_id', $courseId);
-            $results = $query->orderBy('full_name')->paginate(10)->withQueryString();
+            $results = $query->orderBy('full_name')->get();
         } elseif ($type === 'faculties') {
             $query = Faculty::with('department');
             if ($departmentId) $query->where('department_id', $departmentId);
-            $results = $query->orderBy('full_name')->paginate(10)->withQueryString();
+            $results = $query->orderBy('full_name')->get();
         } elseif ($type === 'courses') {
-            $query = Course::with('department');
+            $query = Course::with('department')
+                ->withCount([
+                    'students' => function ($query) {
+                        $query->whereNull('deleted_at');
+                    }
+                ]);
             if ($departmentId) $query->where('department_id', $departmentId);
-            $results = $query->orderBy('code')->paginate(10)->withQueryString();
+            $results = $query->orderBy('code')->get();
         } else {
-            $results = Department::orderBy('code')->paginate(10)->withQueryString();
+            $results = Department::withCount([
+                'courses' => function ($query) {
+                    $query->whereNull('deleted_at');
+                },
+                'faculties' => function ($query) {
+                    $query->whereNull('deleted_at');
+                }
+            ])->orderBy('code')->get();
         }
 
         return response()->json([
-            'results' => $results->items(),
+            'results' => $results,
             'summary' => [
                 'type' => $type,
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
-                'total' => $results->total()
-            ],
-            'pagination' => [
-                'current_page' => $results->currentPage(),
-                'last_page' => $results->lastPage(),
-                'per_page' => $results->perPage(),
-                'total' => $results->total()
+                'total' => $results->count()
             ]
         ]);
+    }
+
+    /**
+     * Generate PDF report for selected items
+     */
+    public function generatePdf(Request $request)
+    {
+        $type = $request->input('type', 'students');
+        $selectedItems = explode(',', $request->input('selected_items', ''));
+        $departmentId = $request->input('department_id');
+        $courseId = $request->input('course_id');
+
+        if (empty($selectedItems)) {
+            return response()->json(['error' => 'No items selected'], 400);
+        }
+
+        $data = [];
+        $title = '';
+        
+        switch ($type) {
+            case 'students':
+                $data = Student::with(['department', 'course', 'academicYear'])
+                    ->whereIn('id', $selectedItems)
+                    ->orderBy('full_name')
+                    ->get();
+                $title = 'Student Report';
+                break;
+                
+            case 'faculties':
+                $data = Faculty::with('department')
+                    ->whereIn('id', $selectedItems)
+                    ->orderBy('full_name')
+                    ->get();
+                $title = 'Faculty Report';
+                break;
+                
+            case 'courses':
+                $data = Course::with([
+                        'department',
+                        'students' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->withCount([
+                        'students' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->whereIn('id', $selectedItems)
+                    ->orderBy('code')
+                    ->get();
+                $title = 'Course Report';
+                break;
+                
+            case 'departments':
+                $data = Department::with([
+                        'courses' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        },
+                        'faculties' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->withCount([
+                        'courses' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        },
+                        'faculties' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->whereIn('id', $selectedItems)
+                    ->orderBy('code')
+                    ->get();
+                $title = 'Department Report';
+                break;
+        }
+
+        $pdf = Pdf::loadView('reports.pdf', [
+            'data' => $data,
+            'type' => $type,
+            'title' => $title,
+            'generated_at' => now()->format('F j, Y g:i A')
+        ]);
+
+        return $pdf->download($type . '_report_' . date('Y-m-d') . '.pdf');
+    }
+
+    /**
+     * Get detailed information for a specific item
+     */
+    public function getItemDetails(Request $request, $type, $id)
+    {
+        switch ($type) {
+            case 'students':
+                $item = Student::with(['department', 'course', 'academicYear'])->find($id);
+                break;
+            case 'faculties':
+                $item = Faculty::with('department')->find($id);
+                break;
+            case 'courses':
+                $item = Course::with(['department', 'students'])
+                    ->withCount([
+                        'students' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->find($id);
+                break;
+            case 'departments':
+                $item = Department::with(['courses', 'faculties'])
+                    ->withCount([
+                        'courses' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        },
+                        'faculties' => function ($query) {
+                            $query->whereNull('deleted_at');
+                        }
+                    ])
+                    ->find($id);
+                break;
+            default:
+                return response()->json(['error' => 'Invalid type'], 400);
+        }
+
+        if (!$item) {
+            return response()->json(['error' => 'Item not found'], 404);
+        }
+
+        return response()->json($item);
     }
 }
